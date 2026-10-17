@@ -1,51 +1,69 @@
 # AstroMesh
 
-AstroMesh is an async orbital-debris mitigation demo with a live browser visualization, contract-based maneuver verification, shared orbital memory, and an evaluator that versions successful playbooks.
+AstroMesh is an agent-driven orbital safety simulation. Its agents detect close approaches, plan satellite maneuvers, independently verify safety constraints, and execute approved thruster burns. A live 3D scene and event stream make each decision and handoff visible.
 
-## Crusoe and Nemotron
+The system is designed around three recursive-agent ideas: define verifiable completion, share useful memory across agents, and promote a better playbook only when it improves on held-out scenarios.
 
-- The default model route is **NVIDIA Nemotron 3 Super 120B through Crusoe Managed Inference**, using Crusoe's OpenAI-compatible `https://api.inference.crusoecloud.com/v1` endpoint. The account catalog ID is `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B`.
-- Put a Crusoe Intelligence Foundry key in `CRUSOE_API_KEY` (or the process environment). For existing setups, when Crusoe is the selected provider the app also accepts `ASTROMESH_LLM_API_KEY`. With neither value configured, the demo uses the deterministic local planner and makes no inference requests.
-- NVIDIA API Catalog can still be selected by setting `ASTROMESH_LLM_PROVIDER=nvidia`, its endpoint and model, then `NVIDIA_API_KEY`.
-- **NemoClaw** is the optional deployment boundary for running the AstroMesh agent service in an OpenShell sandbox with controlled egress. It is not a Python model SDK or an inference endpoint. Follow [NVIDIA's NemoClaw overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html) and current onboarding for your host, then run this service inside the configured sandbox and allow only the required inference and telemetry destinations. Set `ASTROMESH_RUNTIME_MODE=nemoclaw` only when it is actually running in that sandbox. The app runs locally without NemoClaw for development.
+## Orbital operations
 
-The authoritative setup is Crusoe's [Serverless Inference quickstart](https://docs.cloud.crusoe.ai/quickstart/getting-started-with-serverless-inference/index.html) and [available-model catalog](https://docs.cloud.crusoe.ai/serverless-inference/available-models/index.html). Check model access and rate limits in your account before a live demo.
+- **Interactive 3D constellation:** Explore an animated orbital scene containing 16 satellites and 64 debris objects. Rotate and zoom the view, inspect spacecraft, and follow orbital tracks, approaching debris, closest-approach markers, maneuver vectors, and thruster activity.
+- **First-person satellite view:** Select a craft and lock the camera behind it, aligned with its velocity, to see objects approaching its path from the spacecraft's perspective.
+- **Repeatable multi-threat flight:** Start an isolated test flight in which one test spacecraft encounters eight scenarios, each with three concurrent debris threats. The simulation displays detections, the planned compound Δv, thruster burn, changed path, and the verified miss distance for each object.
+- **Live fleet operations:** The live simulation tracks spacecraft telemetry and close approaches. Proposed maneuvers are checked against current state before they are committed; the supervisor can replan or stop for human review when its retry budget is exhausted.
 
-## Run locally
+## Agent decision flow
 
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e .
-Copy-Item .env.example .env
-# Edit .env and add CRUSOE_API_KEY (or ASTROMESH_LLM_API_KEY) for Crusoe.
-uvicorn astromesh.server.api:app --reload --reload-dir astromesh
-```
+AstroMesh exposes the collaboration between agents in a synchronized command and data stream:
 
-For live development, run `astromesh` or use the command above. Backend edits restart the API automatically, and frontend edits refresh open dashboard tabs automatically. A running server launched before live reload was enabled must be restarted once to pick up the reloader.
+1. **Root Architect** establishes the mission contract and maneuver constraints.
+2. **Mission Supervisor** monitors telemetry, raises collision alerts, coordinates replanning, and handles escalation.
+3. **Shared Orbital Memory** supplies relevant observations and prior verified outcomes to the agents and records new results.
+4. **Satellite Worker** evaluates the encounter and proposes a compound trajectory change and thruster burn.
+5. **Adversarial Verifier** independently checks predicted separation from every threat, fuel, burn duration, and configured safety limits.
+6. **Thruster Controller** applies only an approved maneuver to the simulation.
+7. **Playbook Evaluator** scores candidate policies against training and held-out cases and reports whether a candidate qualifies for promotion.
 
-Open <http://127.0.0.1:8000>. The landing view is the interactive 3D orbital scene and agent mesh; supporting metrics and hackathon evidence sit below it. The seeded fleet contains 16 satellites and 64 debris objects. WebSocket telemetry is available at `/ws/telemetry`; REST snapshots are available at `/api/state`, `/api/memory`, and `/api/benchmark`.
+Telemetry handoffs, decisions, verifier results, approvals, burns, replans, and mission outcomes appear in the live stream. The event log lets a reviewer follow why a maneuver was taken, rather than seeing only a final score.
 
-## Demo the three tracks
+## Done Means Done
 
-1. **Done Means Done:** press **START MULTI-THREAT FLIGHT** in the scene. One repeatable test spacecraft faces eight encounters with three simultaneous debris threats. The worker optimizes one compound burn; the independent verifier checks separation from every object, fuel, and duration before the thruster controller fires. The 3D view shows the inbound paths, impact markers, thruster vector, changing trajectory, and live agent data packets. Use the satellite selector and **FIRST-PERSON** toggle to lock the camera behind an active craft along its velocity vector. The test flight is isolated from the live fleet. On live close approaches, plans are rechecked against current telemetry before a burn commits; exhausted retries stop for human review.
-2. **Shared Brain:** the team retrieves nearby telemetry and prior verified outcomes through a durable, conflict-aware memory file at `data/orbital_memory.json`. Agents share a stable system prefix for Crusoe's cache-aware routing. The UI reports actual provider cached-token counts when returned, along with memory reads, writes, conflicts, and deduplicated observations.
-3. **Version N+1:** after three mission outcomes, AstroMesh selects a candidate using training scenarios and compares it with the active playbook on 48 separate held-out scenarios. It promotes only when the candidate beats the parent and preserves the safety checks. Click **RUN 48-CASE HELD-OUT EVAL** to run and show the comparison on demand. Reports include both scores, pass counts, delta, and promotion decision.
+Missions use explicit completion conditions and safety invariants. A maneuver is considered complete only after the verifier checks the simulated result. If the worker's plan fails verification, the supervisor can request another plan within a bounded retry budget; a repeated failure or exhausted budget is surfaced for human review. The UI reports verified missions, replans, stopped loops, and escalations.
 
-For the walkthrough, show one verified approach, deliberately demonstrate a rejected/replanned attempt if one occurs, inspect shared-memory metrics, then run the held-out comparison. The benchmark is deterministic and auditable; do not present a candidate score as a real-world collision rate.
+## Shared Brain
 
-## Show the simulation in NVIDIA Isaac Sim
+Agents read and update a persistent, conflict-aware orbital memory. It stores observations, decisions, and verified outcomes, deduplicates repeated telemetry, and resolves competing updates. The interface reports memory activity and inference cache usage when the provider returns those measurements.
 
-AstroMesh remains the source of simulation state. The browser renders an interactive Three.js 3D scene with Earth, orbital reference rings, animated satellites and debris, inbound collision paths, impact markers, thruster plumes, verified burn vectors, and hover details. Drag to orbit the camera and scroll to zoom. It loads the pinned Three.js release from jsDelivr, so the browser needs access to that CDN. The seeded demo constellation has 16 satellites and 64 debris objects; Isaac Sim receives the same expanded telemetry.
+## Version N+1
 
-1. Start AstroMesh as above and leave it running at `http://127.0.0.1:8000`.
-2. Launch Isaac Sim and open **Window → Script Editor**.
-3. Open and run [`isaac_sim/astromesh_viewer.py`](isaac_sim/astromesh_viewer.py) in the Script Editor. It connects to `/api/state` and updates the USD scene while Isaac Sim runs. The viewer expects Isaac Sim's bundled `pxr`, `omni`, and `isaacsim` Python modules, so run the script inside Isaac Sim rather than a system Python interpreter.
+The Playbook Evaluator selects a candidate using training scenarios, then compares it with the active playbook on a separate set of 48 held-out scenarios. Promotion is gated on measured improvement and retained safety checks. The benchmark view shows both scores, pass counts, score change, and the promotion decision. These are results on synthetic scenarios, not a real-world collision probability.
 
-To use another AstroMesh host, edit `TELEMETRY_URL` at the top of the viewer script. It uses Isaac Sim's USD geometry APIs and the current `ViewportManager` camera API. See NVIDIA's [OpenUSD fundamentals](https://docs.isaacsim.omniverse.nvidia.com/latest/omniverse_usd/open_usd.html) and [viewport rendering manager API](https://docs.isaacsim.omniverse.nvidia.com/latest/py/source/extensions/isaacsim.core.rendering_manager/docs/api.html).
+## Live observability
 
-## Project map
+The browser receives state updates over a WebSocket and can recover with REST snapshots. The scene, agent stream, event log, fleet telemetry, and metrics update from the same simulation state. Observability includes:
 
-`sim/physics.py` contains deterministic orbital-plane dynamics and collision checks. `agents/` contains the architect, worker, independent verifier, persistent mission supervisor, and held-out playbook evaluator. `memory/shared_brain.py` persists observations, verified outcomes, and conflict-aware facts. `server/api.py` runs physics concurrently with async inference, revalidates stale plans before commit, and serves WebSocket telemetry. `frontend/` serves the interactive Three.js dashboard from FastAPI.
+- collision survival and verified avoidance results;
+- agent latency, inference provider status, and rate-limit or fallback state;
+- mission completion, replans, loop stops, and escalations;
+- shared-memory records, deduplicated observations, and cached tokens;
+- playbook version, benchmark scores, and candidate promotion status.
 
-The simulator is illustrative and uses a simplified 2D model with exact closest-approach calculations for linear relative motion; it is not flight software, a high-fidelity propagator, or an operational collision-avoidance service. The scenario lab's success rate describes only its fixed synthetic cases.
+Provider and inference metrics reflect observed calls and provider-reported usage; local fallback work is identified separately.
+
+## Inference and simulation views
+
+When configured, AstroMesh routes agent reasoning through Crusoe Managed Inference using its OpenAI-compatible API and the NVIDIA Nemotron model route. Without a live key, the application can use its deterministic local planner. NemoClaw is an optional OpenShell sandbox boundary for controlling the agent service's access to inference and telemetry; it is not itself the model or inference endpoint.
+
+The browser scene is rendered with Three.js. An optional NVIDIA Isaac Sim viewer reads AstroMesh state and presents the same satellite and debris telemetry in a USD scene. The simulation remains the source of state for both visualizations.
+
+## Project structure
+
+- `astromesh/sim/` — deterministic orbital-plane dynamics and closest-approach checks.
+- `astromesh/agents/` — mission architect, satellite worker, verifier, supervisor, and playbook evaluator.
+- `astromesh/memory/` — persistent shared orbital memory.
+- `astromesh/server/` — simulation orchestration, inference calls, REST snapshots, and WebSocket telemetry.
+- `frontend/` — live operations interface and interactive Three.js orbital scene.
+- `isaac_sim/` — Isaac Sim viewer for the AstroMesh telemetry feed.
+
+## Simulation scope
+
+AstroMesh is a demonstration, not flight software or an operational collision-avoidance service. Its orbital physics use a simplified two-dimensional model with exact closest-approach calculations for linear relative motion. Test-flight success rates describe only the fixed synthetic cases included in the project.
