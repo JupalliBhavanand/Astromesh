@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d18"><title>AstroMesh · Orbital Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css?v=20261018-live1">
+  <link rel="stylesheet" href="/assets/scene3d.css?v=20261018-live1">
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">✳</span><span>ASTRO<span class="brand-light">MESH</span></span></a>
+      <div class="mission"><span class="live-dot"></span><span>MISSION CONTROL</span><span class="divider"></span><span id="clock">T+ 00:00</span></div>
+      <div class="top-right"><span class="model-pill"><span class="model-icon">N</span><span id="model-label">NVIDIA · NEMOTRON</span></span><span class="connection"><i id="connection-dot"></i><span id="connection-label">CONNECTING</span></span></div>
+    </header>
+
+    <main>
+      <section class="intro"><div><div class="eyebrow">AUTONOMOUS ORBITAL SAFETY SYSTEM <span>·</span> SIMULATION 01</div><h1>Orbital operations<span class="period">.</span></h1><p>Live constellation telemetry and autonomous collision avoidance.</p></div><div class="mission-state"><span class="state-label">SYSTEM STATUS</span><strong><b class="live-dot"></b> <span id="system-status-text">CONNECTING</span></strong><small id="system-status-caption">Awaiting live telemetry</small></div></section>
+
+      <section class="content-grid">
+        <article class="panel orbit-panel"><div class="panel-header"><div><div class="panel-title">CONSTELLATION / 3D VIEW</div><div class="panel-sub">Live orbital scene · drag to rotate · scroll to zoom</div></div><div class="orbit-controls"><span class="scale">RANGE <b>±40 KM</b></span><select id="fpv-satellite" class="fpv-select" aria-label="Select satellite for first-person view"><option value="S-01">S-01</option></select><button id="fpv-toggle" class="view-reset" aria-pressed="false">◎ FIRST-PERSON</button><button class="view-reset" onclick="resetOrbitView()">⌖ RESET VIEW</button><span class="orbit-badge"><i></i> LIVE TRACKING</span></div></div>
+          <div class="test-control"><div><b>ONE AUTONOMOUS CRAFT · 8 TRIPLE-THREAT ENCOUNTERS</b><span id="test-status">Watch three debris objects converge, then see one verified compound maneuver clear all three.</span></div><button id="run-collision-tests" class="test-button">▶ START MULTI-THREAT FLIGHT</button></div>
+          <div class="canvas-wrap"><canvas id="orbit-canvas" aria-label="Interactive 3D scene showing satellites and debris, with selectable first-person camera mode"></canvas><div id="scene-loading" class="scene-loading">INITIALIZING 3D ORBITAL SCENE<span><i></i><i></i><i></i></span></div><div class="scene-vignette"></div><div class="canvas-tooltip" id="tooltip"></div><div class="canvas-corner top-left"><span class="corner-orb">◉</span> EARTH ORBIT <span>·</span> 3D TRACKING</div><div id="fpv-hud" class="fpv-hud"><b>FPV · <span id="fpv-label">S-01</span></b><span id="fpv-threat-count">SCANNING CONTACTS</span><small>CAMERA LOCKED TO VELOCITY VECTOR</small></div><div class="canvas-corner bottom-right" id="tick-label">EPOCH 01 / T+ 000</div><div class="scene-reticle">+</div></div>
+          <div class="legend"><span><i class="legend-satellite"></i> SATELLITES <b id="sat-count">16</b></span><span><i class="legend-debris"></i> DEBRIS OBJECTS <b id="debris-count">64</b></span><span><i class="legend-vector"></i> VERIFIED BURN</span><span class="coverage"><span>AVG. COVERAGE</span><b id="coverage">—%</b></span></div>
+          <div class="test-results" id="test-results"><div class="test-result-empty">EACH CASE SHOWS THREE DETECTIONS, ONE COMPOUND BURN, AND THE VERIFIED MISS DISTANCE FOR EVERY OBJECT.</div></div>
+        </article>
+
+        <aside class="panel agent-panel"><div class="panel-header"><div><div class="panel-title">AGENT MESH</div><div class="panel-sub">Live autonomous control · shared message bus</div></div><span class="mesh-status"><i></i> 4 AGENTS · 1 SUPERVISOR</span></div>
+          <div class="agent-list">
+            <div class="agent-row" data-agent="root_architect"><span class="agent-avatar architect">A</span><span class="agent-info"><b>Root Architect</b><small>Invariant safety contract</small></span><span class="agent-state">READY</span></div>
+            <div class="agent-row" data-agent="shared_memory"><span class="agent-avatar memory-avatar">M</span><span class="agent-info"><b>Shared Orbital Memory</b><small>Telemetry · prior decisions · facts</small></span><span class="agent-state">SYNC</span></div>
+            <div class="agent-row" data-agent="satellite_worker"><span class="agent-avatar worker">S</span><span class="agent-info"><b>Satellite Worker</b><small>Trajectory + thruster plan</small></span><span class="agent-state">READY</span></div>
+            <div class="agent-row" data-agent="adversarial_verifier"><span class="agent-avatar verifier">V</span><span class="agent-info"><b>Adversarial Verifier</b><small>Physics safety gate</small></span><span class="agent-state">READY</span></div>
+            <div class="agent-row" data-agent="thruster_controller"><span class="agent-avatar thruster-avatar">T</span><span class="agent-info"><b>Thruster Controller</b><small>Executes approved Δv</small></span><span class="agent-state">ARMED</span></div>
+            <div class="agent-row" data-agent="playbook_evaluator"><span class="agent-avatar evaluator">E</span><span class="agent-info"><b>Playbook Evaluator</b><small>Train/test holdout</small></span><span class="agent-state">WATCH</span></div>
+            <div class="agent-row supervisor-row" data-agent="mission_supervisor"><span class="agent-avatar supervisor-avatar">↻</span><span class="agent-info"><b>Mission Supervisor</b><small>Replans · loop stops · human handoff</small></span><span class="agent-state">WATCH</span></div>
+          </div>
+          <div class="mesh-footer"><span><span class="memory-icon">◈</span> SHARED ORBITAL MEMORY</span><b id="memory-nodes">0 NODES</b></div>
+          <div class="flow-heading"><span>AGENT COMMAND &amp; DATA STREAM</span><b id="mission-stage-label">SCANNING</b></div><div class="mission-flow" id="agent-flow"><div class="flow-empty">Waiting for an approaching object.</div></div>
+          <div class="provider-note"><span class="provider-mark">N</span><span class="provider-copy">Reasoning via <b id="provider-name">Nemotron</b><small id="runtime-name">Local runtime · telemetry pending</small><small id="inference-proof">0 successful live calls</small></span><button id="inference-probe" class="inference-probe">VERIFY LIVE CALL</button></div>
+        </aside>
+
+      </section>
+
+      <section class="metrics" aria-label="Mission metrics">
+        <article class="metric-card"><div class="metric-head"><span>COLLISION SURVIVAL</span><span class="metric-icon green">↗</span></div><div class="metric-value" id="survival">100<span>%</span></div><div class="metric-foot"><span class="mini-bar"><i id="survival-bar"></i></span><span>Fleet integrity</span></div></article>
+        <article class="metric-card"><div class="metric-head"><span>AVOIDANCE SUCCESS</span><span class="metric-icon blue">◎</span></div><div class="metric-value" id="avoidance">—<span>%</span></div><div class="metric-foot"><span class="metric-sub" id="maneuver-count">0 maneuvers verified</span></div></article>
+        <article class="metric-card"><div class="metric-head"><span>AVG AGENT LATENCY</span><span class="metric-icon violet">⌁</span></div><div class="metric-value" id="latency">—<span>ms</span></div><div class="metric-foot"><span class="metric-sub" id="provider-mode">Local planner · ready</span></div></article>
+        <article class="metric-card"><div class="metric-head"><span>PLAYBOOK VERSION</span><span class="metric-icon amber">⌘</span></div><div class="metric-value version" id="version">v1<span class="delta" id="score-delta">+0.00</span></div><div class="metric-foot"><span class="metric-sub">Self-evaluating trajectory policy</span></div></article>
+      </section>
+
+      <section class="proof-grid" aria-label="Hackathon track evidence">
+        <article class="proof-card proof-done"><div class="proof-top"><span class="proof-track">TRACK 01</span><span class="proof-state"><i></i> CLOSED-LOOP</span></div><h2>Done means done</h2><p>Immutable safety envelope · verifier-gated completion</p><div class="proof-value" id="proof-done-main">0 / 0 <small>missions verified</small></div><div class="proof-detail" id="proof-done-detail">0 replans · 0 loops stopped · 0 human escalations</div></article>
+        <article class="proof-card proof-memory"><div class="proof-top"><span class="proof-track">TRACK 02</span><span class="proof-state"><i></i> SHARED STATE</span></div><h2>Shared brain</h2><p>Durable observations · conflict-aware team memory</p><div class="proof-value" id="proof-memory-main">0 <small>shared records</small></div><div class="proof-detail" id="proof-memory-detail">0 outcomes · 0 duplicate writes avoided · 0 API cache tokens</div></article>
+        <article class="proof-card proof-version"><div class="proof-top"><span class="proof-track">TRACK 03</span><span class="proof-state" id="proof-version-state"><i></i> HELD-OUT EVAL</span></div><h2>Version N+1</h2><p>Train-selected candidate · untouched scenario holdout</p><div class="proof-value" id="proof-version-main">Awaiting benchmark</div><div class="proof-detail" id="proof-version-detail">48 unseen scenarios · no candidate promoted yet</div><button id="run-benchmark" class="benchmark-button">RUN 48-CASE HELD-OUT EVAL <span>↗</span></button></article>
+      </section>
+
+      <section class="content-grid support-grid">
+        <article class="panel log-panel"><div class="panel-header"><div><div class="panel-title">MISSION EVENT LOG</div><div class="panel-sub">Verified actions and system events</div></div><span class="log-count" id="event-count">0 EVENTS</span></div><div class="event-list" id="events"><div class="empty-state"><span>◌</span><b>Monitoring orbital paths</b><small>Verified maneuvers will appear here</small></div></div></article>
+        <article class="panel telemetry-panel"><div class="panel-header"><div><div class="panel-title">FLEET TELEMETRY</div><div class="panel-sub">Individual spacecraft status</div></div><div class="fleet-meta"><span id="fleet-summary">16 UNITS · 16 ACTIVE</span><span class="telemetry-live"><i></i> STREAMING</span></div></div><div class="fleet-table"><div class="table-head"><span>UNIT</span><span>POSITION <small>KM</small></span><span>FUEL</span><span>COVERAGE</span><span>STATUS</span></div><div id="fleet-rows"></div></div><div class="token-foot"><span>INFERENCE TOKEN FOOTPRINT</span><b><span id="tokens">0</span> <small>TOKENS</small></b></div></article>
+      </section>
+      <footer><span>ASTROMESH <b>SIMULATION ENVIRONMENT</b></span><span>NOT FOR OPERATIONAL FLIGHT USE <i>·</i> MODEL OUTPUTS ARE PHYSICS-VERIFIED</span><span id="updated-at">AWAITING TELEMETRY</span></footer>
+    </main>
+  </div>
+  <script type="module" src="/assets/scene3d.js?v=20261018-live1"></script>
+  <script src="/assets/app.js?v=20261018-live1"></script>
+</body>
+</html>
